@@ -3,16 +3,17 @@
 
 ADS1115 ADS(0x48);
 
+const uint8_t ledPin = 13; // Define the LED pin
 
-uint8_t pair = 01;
 int16_t val_23 = 0;
 
 volatile bool readFlag = false;
 volatile unsigned long timestamp = 0;
+volatile uint16_t led_delay = 0;
 
 // Калибровочные точки:
-const int16_t adc1 = 210;    // код при 0 Па
-const int16_t adc2 = 7960;   // код при 1.000 бар (700000 Па)
+const int16_t adc1 = 110;    // код при 0 Па
+const int16_t adc2 = 1395;   // код при 1.000 бар (700000 Па)
 
 const float P1 = 0.0;         // давление при adc1
 const float P2 = 7.0;    // давление при adc2
@@ -20,8 +21,14 @@ const float P2 = 7.0;    // давление при adc2
 const float a = (P2 - P1) / (adc2 - adc1);
 const float b = P1 - a * adc1;
 
+// put function declarations here:
+bool handleConversion();
+float toPresure(int16_t adc_code);
+uint8_t calcCRC(const String& str);
+
 void setup()
 {
+  pinMode(ledPin, OUTPUT); // Set the LED pin as an output
   Serial.begin(115200);
   Serial.println();
   Serial.println(__FILE__);
@@ -59,6 +66,11 @@ ISR(TIMER1_COMPA_vect)
 {
   readFlag = true;
   timestamp++;
+  led_delay++;
+  if (led_delay == 1000) {
+    digitalWrite(ledPin, !digitalRead(ledPin));
+    led_delay = 0;
+  }
 }
 
 void loop()
@@ -66,8 +78,8 @@ void loop()
   if (readFlag) {
     if (handleConversion() == true) {
       readFlag = false;
-      // time; adc_code; presure; voltage; crc
-      String line = String(timestamp) + ";" + String(val_23) + ";" + String(toPresure(val_23)) + ";" + String(ADS.toVoltage(val_23));
+      // time; adc_code; presure; crc
+      String line = String(timestamp) + ";" + String(val_23) + ";" + String(toPresure(val_23));// + ";" + String(ADS.toVoltage(val_23));
       uint8_t crc = calcCRC(line);
       Serial.print(line);
       Serial.print(";");
